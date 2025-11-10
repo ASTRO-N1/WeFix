@@ -7,10 +7,9 @@ const LiveFeed = () => {
   const [newComplaints, setNewComplaints] = useState([]);
 
   useEffect(() => {
-    // --- THIS IS THE FIX ---
-    // Changed channel name to be unique
+    // 1. UNIQUE CHANNEL NAME (was "realtime-complaints")
     const channel = supabase
-      .channel("public-feed") // Was "realtime-complaints"
+      .channel("public-feed")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "complaints" },
@@ -46,7 +45,8 @@ const LiveFeed = () => {
                   {complaint.profile.full_name}
                 </span>{" "}
                 just submitted:
-              </s_h2>
+              </p> 
+              {/* 2. THIS IS THE FIX (was </s_h2>) */}
               <p className="font-semibold mt-1">{complaint.title}</p>
             </div>
           ))
