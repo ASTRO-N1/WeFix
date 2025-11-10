@@ -27,9 +27,12 @@ export const ComplaintProvider = ({ children }) => {
       return;
     }
 
+    // --- THIS IS THE FIX ---
+    // We now filter by the logged-in user's ID.
     const { data, error } = await supabase
       .from("complaints")
       .select("*")
+      .eq("user_id", user.id) // This line was added
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -46,6 +49,7 @@ export const ComplaintProvider = ({ children }) => {
     fetchComplaints();
 
     // Set up the real-time subscription
+    // This channel name is fine, it will refetch this user's complaints
     const channel = supabase
       .channel("realtime-complaints")
       .on(
