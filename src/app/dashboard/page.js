@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../utils/supabaseClient";
 import { useComplaints } from "../context/ComplaintContext";
+import LiveFeed from "../components/LiveFeed"; // <-- 1. ADD THIS IMPORT
 
 const DashboardHomePage = () => {
   const router = useRouter();
@@ -126,6 +127,13 @@ const DashboardHomePage = () => {
           )}
         </div>
       </div>
+
+      {/* --- 2. ADD THIS ENTIRE BLOCK --- */}
+      <div className="lg:hidden">
+        <LiveFeed />
+      </div>
+      {/* ------------------------------- */}
+      
     </div>
   );
 };
