@@ -1,13 +1,13 @@
 // src/app/admin/dashboard/page.js
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation"; // No longer needed
 import { supabase } from "../../../../utils/supabaseClient";
 
 const AdminDashboard = () => {
-  const router = useRouter();
+  // const router = useRouter(); // Removed
   const [complaints, setComplaints] = useState([]);
-  const [isLoading, setIsLoading] = useState(true); // Add a loading state
+  const [isLoading, setIsLoading] = useState(true); // Still used for initial load
   const statuses = [
     "Pending",
     "Under Scrutiny",
@@ -16,7 +16,10 @@ const AdminDashboard = () => {
     "Resolved",
   ];
 
+  // This function just fetches data.
+  // We keep it in useCallback for stable dependency in useEffect.
   const fetchAllComplaints = useCallback(async () => {
+    // We don't set isLoading(true) here, to prevent flashes on realtime updates
     const { data, error } = await supabase
       .from("complaints")
       .select(`*, profiles (full_name)`)
@@ -30,51 +33,36 @@ const AdminDashboard = () => {
     }
   }, []);
 
+  // New, simplified useEffect for the *initial* data load
   useEffect(() => {
-    // --- REAL-TIME AUTH LISTENER ---
-    // This is the key to making the security check instant.
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        // If user logs out or session is lost, redirect immediately
-        if (event === "SIGNED_OUT" || !session) {
-          router.replace("/admin");
-          return;
-        }
+    const initialLoad = async () => {
+      setIsLoading(true); // Set loading true at the start
+      await fetchAllComplaints();
+      setIsLoading(false); // Set loading false after initial fetch
+    };
+    initialLoad();
+  }, [fetchAllComplaints]); // Dependency on fetchAllComplaints
 
-        // Check the user's role from the database function
-        const { data: role, error } = await supabase.rpc("get_user_role");
-
-        if (error || role !== "admin") {
-          // If they are not an admin, sign them out and redirect
-          await supabase.auth.signOut();
-          router.replace("/admin");
-        } else {
-          // If they are a confirmed admin, load the data
-          setIsLoading(false);
-          fetchAllComplaints();
-        }
-      }
-    );
-
+  // Modified useEffect for *real-time updates* (auth logic removed)
+  useEffect(() => {
     // --- REAL-TIME DATA LISTENER ---
-    // This remains the same to keep the complaints list updated
     const channel = supabase
       .channel("admin-complaints-realtime")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "complaints" },
         (payload) => {
+          // When a change is received, refetch the data
           fetchAllComplaints();
         }
       )
       .subscribe();
 
-    // Cleanup listeners when the component unmounts
+    // Cleanup listener when the component unmounts
     return () => {
-      authListener.subscription.unsubscribe();
       supabase.removeChannel(channel);
     };
-  }, [router, fetchAllComplaints]);
+  }, [fetchAllComplaints]); // Dependency on fetchAllComplaints
 
   const handleStatusChange = async (complaintId, newStatus) => {
     const originalComplaints = [...complaints];
@@ -100,11 +88,11 @@ const AdminDashboard = () => {
     }
   };
 
-  // Display a loading message until the admin check is complete
+  // Updated loading message
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen text-white">
-        <p>Verifying admin access...</p>
+        <p>Loading complaints...</p>
       </div>
     );
   }
