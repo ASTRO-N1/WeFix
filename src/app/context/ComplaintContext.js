@@ -15,9 +15,8 @@ export const ComplaintProvider = ({ children }) => {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // This function is still correct: it only fetches *this* user's complaints
   const fetchComplaints = useCallback(async () => {
-    // We don't need to set loading to true here on every refetch
-    // to prevent the loading spinner from flashing on every update.
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -27,12 +26,10 @@ export const ComplaintProvider = ({ children }) => {
       return;
     }
 
-    // --- THIS IS THE FIX ---
-    // We now filter by the logged-in user's ID.
     const { data, error } = await supabase
       .from("complaints")
       .select("*")
-      .eq("user_id", user.id) // This line was added
+      .eq("user_id", user.id) // This line keeps your "View My Complaints" private
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -44,29 +41,52 @@ export const ComplaintProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+
+  // --- THIS useEffect IS NOW SMARTER ---
   useEffect(() => {
-    // Fetch initial data
+    // 1. Fetch the initial data
     fetchComplaints();
 
-    // Set up the real-time subscription
-    // This channel name is fine, it will refetch this user's complaints
-    const channel = supabase
-      .channel("realtime-complaints")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "complaints" },
-        (payload) => {
-          // When a change is received, refetch the data
-          fetchComplaints();
-        }
-      )
-      .subscribe();
+    // 2. We need a variable to hold our channel so we can clean it up
+    let channel;
 
-    // Cleanup the subscription when the component unmounts
-    return () => {
-      supabase.removeChannel(channel);
+    // 3. Create an async function to get the user and set up the subscription
+    const setupSubscription = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return; // Not logged in, so don't subscribe
+
+      // 4. Create a UNIQUE channel name just for this user
+      channel = supabase
+        .channel(`realtime-user-complaints:${user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*", // Listen for INSERT, UPDATE, DELETE
+            schema: "public",
+            table: "complaints",
+            // 5. THIS IS THE KEY: Only listen for messages where user_id matches
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            // When a change to *my* complaints happens, refetch
+            fetchComplaints();
+          }
+        )
+        .subscribe();
     };
-  }, [fetchComplaints]);
+    
+    // Call the async function to set up the subscription
+    setupSubscription();
+
+    // 6. The cleanup function
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [fetchComplaints]); // This dependency is still correct
 
   return (
     <ComplaintContext.Provider value={{ complaints, loading, fetchComplaints }}>
