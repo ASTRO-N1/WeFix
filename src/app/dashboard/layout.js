@@ -95,6 +95,10 @@ const DashboardLayout = ({ children }) => {
 
         {/* Main Content */}
         <main className="flex-1 p-6 md:p-10 overflow-y-auto">{children}</main>
+
+        <aside className="hidden lg:block w-80 flex-shrink-0 bg-gray-800 p-5 border-l border-gray-700 overflow-y-auto">
+          <LiveFeed />
+        </aside>
       </div>
     </ComplaintProvider>
   );
