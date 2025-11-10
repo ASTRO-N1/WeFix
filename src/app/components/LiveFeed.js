@@ -7,23 +7,34 @@ const LiveFeed = () => {
   const [newComplaints, setNewComplaints] = useState([]);
 
   useEffect(() => {
-    // 1. UNIQUE CHANNEL NAME (was "realtime-complaints")
     const channel = supabase
       .channel("public-feed")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "complaints" },
         async (payload) => {
+          
+          // --- DEBUGGING LOGS ADDED ---
+          console.log("Live Feed: Received new complaint!", payload.new);
+
           const { data, error } = await supabase
             .from("profiles")
             .select("full_name")
             .eq("id", payload.new.user_id)
             .single();
+          
+          if (error) {
+            console.error("Live Feed Error fetching profile:", error);
+          }
 
           if (data) {
+            console.log("Live Feed: Successfully fetched profile data:", data);
             const complaintWithProfile = { ...payload.new, profile: data };
             setNewComplaints((prev) => [complaintWithProfile, ...prev]);
+          } else {
+            console.warn("Live Feed: No profile data returned. Check RLS on 'profiles' table.");
           }
+          // --- END DEBUGGING LOGS ---
         }
       )
       .subscribe();
@@ -45,8 +56,7 @@ const LiveFeed = () => {
                   {complaint.profile.full_name}
                 </span>{" "}
                 just submitted:
-              </p> 
-              {/* 2. THIS IS THE FIX (was </s_h2>) */}
+              </p>
               <p className="font-semibold mt-1">{complaint.title}</p>
             </div>
           ))
