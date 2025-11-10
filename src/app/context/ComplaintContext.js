@@ -13,10 +13,11 @@ const ComplaintContext = createContext(null);
 
 export const ComplaintProvider = ({ children }) => {
   const [complaints, setComplaints] = useState([]);
+  const [publicFeed, setPublicFeed] = useState([]); // <-- ADD THIS
   const [loading, setLoading] = useState(true);
 
-  // This function is still correct: it only fetches *this* user's complaints
   const fetchComplaints = useCallback(async () => {
+    // ... (this function is unchanged)
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -29,7 +30,7 @@ export const ComplaintProvider = ({ children }) => {
     const { data, error } = await supabase
       .from("complaints")
       .select("*")
-      .eq("user_id", user.id) // This line keeps your "View My Complaints" private
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -41,55 +42,51 @@ export const ComplaintProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-
-  // --- THIS useEffect IS NOW SMARTER ---
   useEffect(() => {
-    // 1. Fetch the initial data
+    // Fetch initial data
     fetchComplaints();
 
-    // 2. We need a variable to hold our channel so we can clean it up
-    let channel;
+    // This one channel will now handle BOTH user complaints AND the live feed.
+    const channel = supabase
+      .channel("realtime-complaints") // We use just this one channel
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "complaints" },
+        async (payload) => {
+          // 1. Refetch the user's own complaints on any change
+          fetchComplaints();
 
-    // 3. Create an async function to get the user and set up the subscription
-    const setupSubscription = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return; // Not logged in, so don't subscribe
+          // 2. If it's a new complaint, add it to the public feed
+          if (payload.eventType === "INSERT") {
+            // Fetch the profile for the new complaint
+            const { data, error } = await supabase
+              .from("profiles")
+              .select("full_name")
+              .eq("id", payload.new.user_id)
+              .single();
 
-      // 4. Create a UNIQUE channel name just for this user
-      channel = supabase
-        .channel(`realtime-user-complaints:${user.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "*", // Listen for INSERT, UPDATE, DELETE
-            schema: "public",
-            table: "complaints",
-            // 5. THIS IS THE KEY: Only listen for messages where user_id matches
-            filter: `user_id=eq.${user.id}`,
-          },
-          (payload) => {
-            // When a change to *my* complaints happens, refetch
-            fetchComplaints();
+            if (data) {
+              const complaintWithProfile = { ...payload.new, profile: data };
+              // Add the new complaint to the start of the feed
+              setPublicFeed((prev) => [complaintWithProfile, ...prev]);
+            } else if (error) {
+              console.error("Error fetching profile for live feed:", error);
+            }
           }
-        )
-        .subscribe();
-    };
-    
-    // Call the async function to set up the subscription
-    setupSubscription();
+        }
+      )
+      .subscribe();
 
-    // 6. The cleanup function
+    // Cleanup the subscription when the component unmounts
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
-      }
+      supabase.removeChannel(channel);
     };
-  }, [fetchComplaints]); // This dependency is still correct
+  }, [fetchComplaints]); // Dependency is correct
 
   return (
-    <ComplaintContext.Provider value={{ complaints, loading, fetchComplaints }}>
+    <ComplaintContext.Provider
+      value={{ complaints, loading, publicFeed, fetchComplaints }} // <-- PASS publicFeed
+    >
       {children}
     </ComplaintContext.Provider>
   );
