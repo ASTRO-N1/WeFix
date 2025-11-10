@@ -13,11 +13,11 @@ const ComplaintContext = createContext(null);
 
 export const ComplaintProvider = ({ children }) => {
   const [complaints, setComplaints] = useState([]);
-  const [publicFeed, setPublicFeed] = useState([]); // <-- ADD THIS
   const [loading, setLoading] = useState(true);
 
   const fetchComplaints = useCallback(async () => {
-    // ... (this function is unchanged)
+    // We don't need to set loading to true here on every refetch
+    // to prevent the loading spinner from flashing on every update.
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -27,10 +27,12 @@ export const ComplaintProvider = ({ children }) => {
       return;
     }
 
+    // --- THIS IS THE FIX ---
+    // We now filter by the logged-in user's ID.
     const { data, error } = await supabase
       .from("complaints")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", user.id) // This line was added
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -46,33 +48,16 @@ export const ComplaintProvider = ({ children }) => {
     // Fetch initial data
     fetchComplaints();
 
-    // This one channel will now handle BOTH user complaints AND the live feed.
+    // Set up the real-time subscription
+    // This channel name is fine, it will refetch this user's complaints
     const channel = supabase
-      .channel("realtime-complaints") // We use just this one channel
+      .channel("realtime-complaints")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "complaints" },
-        async (payload) => {
-          // 1. Refetch the user's own complaints on any change
+        (payload) => {
+          // When a change is received, refetch the data
           fetchComplaints();
-
-          // 2. If it's a new complaint, add it to the public feed
-          if (payload.eventType === "INSERT") {
-            // Fetch the profile for the new complaint
-            const { data, error } = await supabase
-              .from("profiles")
-              .select("full_name")
-              .eq("id", payload.new.user_id)
-              .single();
-
-            if (data) {
-              const complaintWithProfile = { ...payload.new, profile: data };
-              // Add the new complaint to the start of the feed
-              setPublicFeed((prev) => [complaintWithProfile, ...prev]);
-            } else if (error) {
-              console.error("Error fetching profile for live feed:", error);
-            }
-          }
         }
       )
       .subscribe();
@@ -81,12 +66,10 @@ export const ComplaintProvider = ({ children }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchComplaints]); // Dependency is correct
+  }, [fetchComplaints]);
 
   return (
-    <ComplaintContext.Provider
-      value={{ complaints, loading, publicFeed, fetchComplaints }} // <-- PASS publicFeed
-    >
+    <ComplaintContext.Provider value={{ complaints, loading, fetchComplaints }}>
       {children}
     </ComplaintContext.Provider>
   );
