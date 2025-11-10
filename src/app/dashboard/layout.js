@@ -1,6 +1,6 @@
 // src/app/dashboard/layout.js
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // Import useEffect
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { ComplaintProvider } from "../context/ComplaintContext";
@@ -11,7 +11,18 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 const DashboardLayout = ({ children }) => {
   const router = useRouter();
   const pathname = usePathname();
+  // Default to false (open) for desktop, we'll adjust for mobile in useEffect
   const [collapsed, setCollapsed] = useState(false);
+
+  // --- ADDED THIS useEffect ---
+  // This effect runs once on the client to check the screen width
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      // Check if the screen width is "mobile" (e.g., less than 768px)
+      const isMobile = window.innerWidth < 768;
+      setCollapsed(isMobile);
+    }
+  }, []); // Empty dependency array means this runs only on mount
 
   const handleSignOut = async () => {
     if (window.confirm("Are you sure you want to sign out?")) {
@@ -61,8 +72,9 @@ const DashboardLayout = ({ children }) => {
                   pathname === item.href
                     ? "bg-blue-600 text-white"
                     : "text-gray-400 hover:bg-gray-700 hover:text-white"
-                }`}
+                } ${collapsed ? "justify-center" : ""}`} // Center icons/text when collapsed
               >
+                {/* You can add icons here later if you want */}
                 {!collapsed && item.text}
               </Link>
             ))}
@@ -71,8 +83,11 @@ const DashboardLayout = ({ children }) => {
           <div className="mt-auto">
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center px-4 py-2 rounded-md text-sm font-medium text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
+              className={`w-full flex items-center px-4 py-2 rounded-md text-sm font-medium text-gray-400 hover:bg-gray-700 hover:text-white transition-colors ${
+                collapsed ? "justify-center" : ""
+              }`}
             >
+              {/* You can add a sign-out icon here */}
               {!collapsed && "Sign Out"}
             </button>
           </div>

@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../../utils/supabaseClient";
+import { supabase } from "../../../../utils/supabaseClient";
 
 const AdminDashboard = () => {
   const router = useRouter();
