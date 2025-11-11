@@ -16,6 +16,12 @@ const LiveFeed = () => {
       }
     });
 
+    useEffect(() => {
+        window.supabase = supabase;
+        console.log("🪄 Supabase client exposed to window");
+    }, []);
+
+
     console.log("🔌 Setting up realtime channel 'public-feed'...");
 
     const channel = supabase
