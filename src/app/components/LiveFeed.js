@@ -6,13 +6,12 @@ const LiveFeed = () => {
   const [newComplaints, setNewComplaints] = useState([]);
 
   useEffect(() => {
-    console.log("🚀 Initializing Live Feed...");
+    console.log("🚀 Initializing Live Feed (FINAL VERSION)...");
 
-    // Expose Supabase globally for console testing
+    // Expose Supabase for console debugging
     window.supabase = supabase;
-    console.log("🪄 Supabase client exposed to window (try typing `supabase` in console)");
 
-    // Remove any stale channels that may exist
+    // Clean up any old channels before creating new one
     supabase.getChannels().forEach((ch) => {
       if (ch.topic.includes("public:complaints")) {
         console.log("🧹 Removing stale channel:", ch.topic);
@@ -20,36 +19,33 @@ const LiveFeed = () => {
       }
     });
 
-    console.log("🔌 Setting up realtime channel 'public-feed'...");
+    console.log("🔌 Subscribing to realtime changes on complaints...");
 
-    // Create the realtime subscription
     const channel = supabase
-      .channel("public-feed")
+      .channel("debug-feed") // using same verified channel name
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "complaints" },
         async (payload) => {
-          console.log("📩 Received realtime event:", payload);
+          console.log("📩 LiveFeed received event:", payload);
 
           try {
-            // Fetch the submitter’s name
             const { data, error } = await supabase
               .from("profiles")
               .select("full_name")
               .eq("id", payload.new.user_id)
               .maybeSingle();
 
-            if (error) console.error("❌ Error fetching profile:", error);
+            if (error) console.error("❌ Profile fetch error:", error);
 
             const complaintWithProfile = {
               ...payload.new,
               profile: data || { full_name: "Unknown User" },
             };
 
-            // Add new complaint to the top of feed
             setNewComplaints((prev) => [complaintWithProfile, ...prev]);
           } catch (err) {
-            console.error("🔥 Live feed update error:", err);
+            console.error("🔥 LiveFeed state update error:", err);
           }
         }
       )
@@ -57,9 +53,8 @@ const LiveFeed = () => {
         console.log("🧭 Subscription status:", status);
       });
 
-    // Cleanup on unmount
     return () => {
-      console.log("🧹 Cleaning up 'public-feed' channel...");
+      console.log("🧹 Cleaning up debug-feed channel...");
       supabase.removeChannel(channel);
     };
   }, []);
