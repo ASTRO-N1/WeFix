@@ -3,11 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../utils/supabaseClient";
-import { useComplaints } from "../context/ComplaintContext";
 
 const ComplaintForm = () => {
   const router = useRouter();
-  const { fetchComplaints } = useComplaints();
   const [complaintType, setComplaintType] = useState("Pothole");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState(null);
@@ -98,7 +96,6 @@ const ComplaintForm = () => {
       console.error("Error inserting data:", insertError);
       alert("There was a problem submitting your complaint.");
     } else {
-      await fetchComplaints();
       router.push("/dashboard/view-complaints");
     }
     setIsSubmitting(false);
