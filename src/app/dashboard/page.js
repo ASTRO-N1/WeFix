@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../utils/supabaseClient";
-import { useComplaints } from "../context/ComplaintContext"; // We still use this
+import { useComplaints } from "../context/ComplaintContext";
+import LiveFeed from "../components/LiveFeed"; // <-- 1. IMPORT THE LIVE FEED
 
 const DashboardHomePage = () => {
   const router = useRouter();
   const [profile, setProfile] = useState(null);
-  
-  // Get data from our simple, working context
+
+  // We get this from the context, which is now simple and working
   const { myComplaints, loading, fetchMyComplaints } = useComplaints();
 
   useEffect(() => {
@@ -30,9 +31,9 @@ const DashboardHomePage = () => {
     
     fetchProfile();
     
-    // This makes sure our complaint list is up-to-date when we land here
+    // Make sure we have the latest complaints for the user
     fetchMyComplaints();
-  }, [fetchMyComplaints]); // Add fetchMyComplaints as a dependency
+  }, [fetchMyComplaints]);
 
   if (loading || !profile) {
     return (
@@ -42,7 +43,7 @@ const DashboardHomePage = () => {
     );
   }
 
-  // This logic will work now
+  // This logic is now fed by the working context
   const stats = {
     submitted: myComplaints.length,
     resolved: myComplaints.filter((c) => c.status === "Resolved").length,
@@ -60,7 +61,7 @@ const DashboardHomePage = () => {
         </h1>
       </div>
 
-      {/* --- THIS IS THE SECTION THAT WAS MISSING --- */}
+      {/* --- 2. ACTION BUTTONS (FIXED) --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div
           onClick={() => router.push("/dashboard/add-complaint")}
@@ -81,8 +82,6 @@ const DashboardHomePage = () => {
           </p>
         </div>
       </div>
-      {/* --- END OF MISSING SECTION --- */}
-
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -104,7 +103,13 @@ const DashboardHomePage = () => {
         </div>
       </div>
 
-      {/* Recent Activity (This will work now) */}
+      {/* --- 3. LIVE FEED (FOR MOBILE) --- */}
+      {/* This block is visible by default, but hidden on 'lg' screens and up */}
+      <div className="lg:hidden">
+        <LiveFeed />
+      </div>
+
+      {/* --- 4. RECENT ACTIVITY (FIXED & MOVED TO LAST) --- */}
       <div>
         <h2 className="text-xl md:text-2xl font-bold mb-4">Recent Activity</h2>
         <div className="space-y-4 bg-gray-800 p-4 rounded-lg">
