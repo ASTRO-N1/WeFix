@@ -60,6 +60,10 @@ export const ComplaintProvider = ({ children }) => {
             { event: "*", schema: "public", table: "complaints" },
             async (payload) => {
               
+              // --- NEW LOGGING ADDED ---
+              console.log("CONTEXT [NEW LOG]: Received payload:", payload);
+              // --- END NEW LOGGING ---
+              
               const record = payload.new || payload.old;
               
               // --- Handle INSERT (for Live Feed AND My Complaints) ---
@@ -76,6 +80,11 @@ export const ComplaintProvider = ({ children }) => {
                 if (error) console.error("Error fetching profile for live feed:", error);
 
                 const newComplaint = { ...payload.new, profile: profile || {} };
+
+                // --- NEW LOGGING ADDED ---
+                console.log("CONTEXT [NEW LOG]: Adding to Live Feed state:", newComplaint);
+                // --- END NEW LOGGING ---
+
                 setLiveFeedComplaints((prev) => [newComplaint, ...prev.slice(0, 19)]); // Add to live feed (keep it at 20)
 
                 // 2. Check if it's OUR new complaint
