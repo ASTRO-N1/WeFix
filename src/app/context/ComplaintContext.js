@@ -1,4 +1,3 @@
-// src/app/context/ComplaintContext.js
 "use client";
 import {
   createContext,
@@ -16,8 +15,6 @@ export const ComplaintProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchComplaints = useCallback(async () => {
-    // We don't need to set loading to true here on every refetch
-    // to prevent the loading spinner from flashing on every update.
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -27,12 +24,11 @@ export const ComplaintProvider = ({ children }) => {
       return;
     }
 
-    // --- THIS IS THE FIX ---
-    // We now filter by the logged-in user's ID.
+    // Fetch complaints only for the logged-in user
     const { data, error } = await supabase
       .from("complaints")
       .select("*")
-      .eq("user_id", user.id) // This line was added
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -45,29 +41,26 @@ export const ComplaintProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // Fetch initial data
+    // Fetch initial complaints
     fetchComplaints();
 
-    // Set up the real-time subscription
-    // This channel name is fine, it will refetch this user's complaints
-// Comment out this entire block ⬇️
-/*
-const channel = supabase
-  .channel("realtime-complaints")
-  .on(
-    "postgres_changes",
-    { event: "*", schema: "public", table: "complaints" },
-    (payload) => {
-      fetchComplaints();
-    }
-  )
-  .subscribe();
+    // Subscribe to realtime changes on complaints
+    const channel = supabase
+      .channel("realtime-complaints")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "complaints" },
+        (payload) => {
+          // Whenever a complaint changes, refresh the list
+          fetchComplaints();
+        }
+      )
+      .subscribe();
 
-return () => {
-  supabase.removeChannel(channel);
-};
-*/
-
+    // Clean up on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchComplaints]);
 
   return (
