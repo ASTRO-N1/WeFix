@@ -1,54 +1,66 @@
 // src/app/components/LiveFeed.js
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../../utils/supabaseClient";
 
 const LiveFeed = () => {
   const [feedComplaints, setFeedComplaints] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null);
+  
+  // We use a ref to store the timestamp.
+  // This prevents it from resetting on every render.
+  const loadTimestamp = useRef(null);
 
-  // First, get the current user's ID so we can filter them out
+  // 1. Get the current user's ID
   useEffect(() => {
     const getUserId = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setCurrentUserId(user.id);
+        // SET THE TIMESTAMP: Only set it once when the user is first identified.
+        if (!loadTimestamp.current) {
+          loadTimestamp.current = new Date().toISOString();
+        }
       }
     };
     getUserId();
   }, []);
 
-  // This is the polling effect
+  // 2. This is the polling effect
   useEffect(() => {
-    // Don't start polling until we know who the user is
-    if (!currentUserId) return;
+    // Wait until we have the user ID AND the timestamp
+    if (!currentUserId || !loadTimestamp.current) return;
 
     // Function to fetch all complaints *except* our own
-    const fetchOtherComplaints = async () => {
+    // and *only* new ones since the page loaded.
+    const fetchNewComplaints = async () => {
+      
       const { data, error } = await supabase
         .from("complaints")
         .select("*, profiles(full_name)")
-        .neq("user_id", currentUserId) // <-- This filters out the current user
-        .order("created_at", { ascending: false })
-        .limit(20); // Get the 20 most recent
+        .neq("user_id", currentUserId)           // Not from me
+        .gt("created_at", loadTimestamp.current) // Newer than my login
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Live Feed fetch error:", error);
       } else {
+        // Just set the new data. This list will only grow as new
+        // complaints come in.
         setFeedComplaints(data || []);
       }
     };
 
     // Run it immediately on load
-    fetchOtherComplaints();
+    fetchNewComplaints();
 
     // Set up the interval to run it every 5 seconds
-    const interval = setInterval(fetchOtherComplaints, 5000); // 5000ms = 5 seconds
+    const interval = setInterval(fetchNewComplaints, 5000); // 5000ms = 5 seconds
 
     // Clean up the interval when the component unmounts
     return () => clearInterval(interval);
 
-  }, [currentUserId]); // This effect will re-run if the user ID ever changes
+  }, [currentUserId]); // This effect runs once we get the currentUserId
 
   return (
     <div>
