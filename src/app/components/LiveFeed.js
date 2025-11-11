@@ -63,7 +63,10 @@ const LiveFeed = () => {
             </div>
           ))
         ) : (
-          <p className="text-sm text-gray-400">Waiting for new complaints... (This is the one that's not working)</p>
+          <p className="text-sm text-gray-400">
+            {/* THIS IS THE FIX: ' replaced with &apos; */}
+            Waiting for new complaints... (This is the one that&apos;s not working)
+          </p>
         )}
       </div>
 
