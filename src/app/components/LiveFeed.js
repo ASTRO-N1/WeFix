@@ -8,24 +8,23 @@ const LiveFeed = () => {
   useEffect(() => {
     console.log("🚀 Initializing Live Feed...");
 
-    // Clean up any existing duplicate channels before making a new one
+    // Expose Supabase globally for console testing
+    window.supabase = supabase;
+    console.log("🪄 Supabase client exposed to window (try typing `supabase` in console)");
+
+    // Remove any stale channels that may exist
     supabase.getChannels().forEach((ch) => {
-      if (ch.topic === "realtime:public:complaints") {
-        console.log("🧹 Removing old complaints channel...");
+      if (ch.topic.includes("public:complaints")) {
+        console.log("🧹 Removing stale channel:", ch.topic);
         supabase.removeChannel(ch);
       }
     });
 
-    useEffect(() => {
-        window.supabase = supabase;
-        console.log("🪄 Supabase client exposed to window");
-    }, []);
-
-
     console.log("🔌 Setting up realtime channel 'public-feed'...");
 
+    // Create the realtime subscription
     const channel = supabase
-      .channel("public-feed", { config: { broadcast: { ack: true } } })
+      .channel("public-feed")
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "complaints" },
@@ -33,23 +32,21 @@ const LiveFeed = () => {
           console.log("📩 Received realtime event:", payload);
 
           try {
-            // Fetch user full name from profiles table
+            // Fetch the submitter’s name
             const { data, error } = await supabase
               .from("profiles")
               .select("full_name")
               .eq("id", payload.new.user_id)
               .maybeSingle();
 
-            if (error) {
-              console.error("❌ Error fetching profile:", error);
-            }
+            if (error) console.error("❌ Error fetching profile:", error);
 
             const complaintWithProfile = {
               ...payload.new,
               profile: data || { full_name: "Unknown User" },
             };
 
-            // Prepend the new complaint to the feed
+            // Add new complaint to the top of feed
             setNewComplaints((prev) => [complaintWithProfile, ...prev]);
           } catch (err) {
             console.error("🔥 Live feed update error:", err);
@@ -60,6 +57,7 @@ const LiveFeed = () => {
         console.log("🧭 Subscription status:", status);
       });
 
+    // Cleanup on unmount
     return () => {
       console.log("🧹 Cleaning up 'public-feed' channel...");
       supabase.removeChannel(channel);
