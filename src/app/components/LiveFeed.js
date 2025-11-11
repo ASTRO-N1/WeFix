@@ -8,11 +8,6 @@ const LiveFeed = () => {
   useEffect(() => {
     console.log("🚀 Initializing Live Feed...");
 
-    // Listen for realtime reconnections
-    supabase.realtime.onReconnect(() => {
-      console.log("♻️ Realtime socket reconnected — resubscribing...");
-    });
-
     // Clean up any existing duplicate channels before making a new one
     supabase.getChannels().forEach((ch) => {
       if (ch.topic === "realtime:public:complaints") {
