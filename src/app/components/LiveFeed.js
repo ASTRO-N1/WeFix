@@ -7,27 +7,47 @@ const LiveFeed = () => {
   const [newComplaints, setNewComplaints] = useState([]);
 
   useEffect(() => {
-    // 1. UNIQUE CHANNEL NAME (was "realtime-complaints")
+    // Avoid duplicate channels (important in dev/hot reload)
+    supabase.getChannels().forEach((ch) => {
+      if (ch.topic === "realtime:public:complaints") {
+        supabase.removeChannel(ch);
+      }
+    });
+
     const channel = supabase
-      .channel("public-feed")
+      .channel("public-feed", { config: { broadcast: { ack: true } } })
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "complaints" },
         async (payload) => {
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("id", payload.new.user_id)
-            .single();
+          try {
+            // Try to join the user name directly via SQL (faster + reliable)
+            const { data, error } = await supabase
+              .from("profiles")
+              .select("full_name")
+              .eq("id", payload.new.user_id)
+              .maybeSingle();
 
-          if (data) {
-            const complaintWithProfile = { ...payload.new, profile: data };
+            if (error) console.error(error);
+
+            const complaintWithProfile = {
+              ...payload.new,
+              profile: data || { full_name: "Unknown User" },
+            };
+
             setNewComplaints((prev) => [complaintWithProfile, ...prev]);
+          } catch (err) {
+            console.error("Live feed update error:", err);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("✅ Live feed subscribed successfully");
+        }
+      });
 
+    // Cleanup
     return () => {
       supabase.removeChannel(channel);
     };
@@ -45,8 +65,7 @@ const LiveFeed = () => {
                   {complaint.profile.full_name}
                 </span>{" "}
                 just submitted:
-              </p> 
-              {/* 2. THIS IS THE FIX (was </s_h2>) */}
+              </p>
               <p className="font-semibold mt-1">{complaint.title}</p>
             </div>
           ))
