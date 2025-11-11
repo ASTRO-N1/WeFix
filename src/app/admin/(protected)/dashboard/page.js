@@ -1,13 +1,11 @@
 // src/app/admin/dashboard/page.js
 "use client";
 import { useState, useEffect, useCallback } from "react";
-// import { useRouter } from "next/navigation"; // No longer needed
 import { supabase } from "../../../../utils/supabaseClient";
 
 const AdminDashboard = () => {
-  // const router = useRouter(); // Removed
   const [complaints, setComplaints] = useState([]);
-  const [isLoading, setIsLoading] = useState(true); // Still used for initial load
+  const [isLoading, setIsLoading] = useState(true); // For the *initial* load
   const statuses = [
     "Pending",
     "Under Scrutiny",
@@ -16,10 +14,10 @@ const AdminDashboard = () => {
     "Resolved",
   ];
 
-  // This function just fetches data.
-  // We keep it in useCallback for stable dependency in useEffect.
+  // This function fetches all non-resolved complaints
+  // We keep it in useCallback for stable dependency in useEffect
   const fetchAllComplaints = useCallback(async () => {
-    // We don't set isLoading(true) here, to prevent flashes on realtime updates
+    // We DON'T set isLoading(true) here, to avoid screen flashes on polling
     const { data, error } = await supabase
       .from("complaints")
       .select(`*, profiles (full_name)`)
@@ -31,9 +29,9 @@ const AdminDashboard = () => {
     } else {
       setComplaints(data || []);
     }
-  }, []);
+  }, []); // Empty dependency, this function is stable
 
-  // New, simplified useEffect for the *initial* data load
+  // This useEffect runs ONCE for the initial page load
   useEffect(() => {
     const initialLoad = async () => {
       setIsLoading(true); // Set loading true at the start
@@ -43,27 +41,22 @@ const AdminDashboard = () => {
     initialLoad();
   }, [fetchAllComplaints]); // Dependency on fetchAllComplaints
 
-  // Modified useEffect for *real-time updates* (auth logic removed)
+  // --- THIS IS THE NEW POLLING LOGIC ---
+  // This useEffect replaces the old Realtime subscription
   useEffect(() => {
-    // --- REAL-TIME DATA LISTENER ---
-    const channel = supabase
-      .channel("admin-complaints-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "complaints" },
-        (payload) => {
-          // When a change is received, refetch the data
-          fetchAllComplaints();
-        }
-      )
-      .subscribe();
+    console.log("Admin Dashboard: Polling for complaints every 5 seconds...");
+    
+    // Set up the interval to run fetchAllComplaints every 5 seconds
+    const interval = setInterval(() => {
+      fetchAllComplaints();
+    }, 5000); // 5000ms = 5 seconds
 
-    // Cleanup listener when the component unmounts
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(interval);
+
   }, [fetchAllComplaints]); // Dependency on fetchAllComplaints
 
+  // This function for updating status remains the same
   const handleStatusChange = async (complaintId, newStatus) => {
     const originalComplaints = [...complaints];
     const updatedComplaints = complaints.map((c) =>
@@ -88,7 +81,7 @@ const AdminDashboard = () => {
     }
   };
 
-  // Updated loading message
+  // This loading message is only for the initial load
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen text-white">
