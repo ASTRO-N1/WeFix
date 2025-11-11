@@ -50,22 +50,24 @@ export const ComplaintProvider = ({ children }) => {
 
     // Set up the real-time subscription
     // This channel name is fine, it will refetch this user's complaints
-    const channel = supabase
-      .channel("realtime-complaints")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "complaints" },
-        (payload) => {
-          // When a change is received, refetch the data
-          fetchComplaints();
-        }
-      )
-      .subscribe();
+// Comment out this entire block ⬇️
+/*
+const channel = supabase
+  .channel("realtime-complaints")
+  .on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "complaints" },
+    (payload) => {
+      fetchComplaints();
+    }
+  )
+  .subscribe();
 
-    // Cleanup the subscription when the component unmounts
-    return () => {
-      supabase.removeChannel(channel);
-    };
+return () => {
+  supabase.removeChannel(channel);
+};
+*/
+
   }, [fetchComplaints]);
 
   return (
