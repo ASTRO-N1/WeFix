@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../utils/supabaseClient";
+import { useComplaints } from "../context/ComplaintContext"; // <-- RE-ADD THIS
 
 const ComplaintForm = () => {
   const router = useRouter();
+  const { fetchMyComplaints } = useComplaints(); // <-- GET THE REFRESH FUNCTION
   const [complaintType, setComplaintType] = useState("Pothole");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState(null);
@@ -44,7 +46,6 @@ const ComplaintForm = () => {
     }
   };
 
-  // --- THIS FUNCTION WAS MISSING ---
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!location) {
@@ -96,6 +97,7 @@ const ComplaintForm = () => {
       console.error("Error inserting data:", insertError);
       alert("There was a problem submitting your complaint.");
     } else {
+      await fetchMyComplaints(); // <-- CALL THE REFRESH FUNCTION HERE
       router.push("/dashboard/view-complaints");
     }
     setIsSubmitting(false);
