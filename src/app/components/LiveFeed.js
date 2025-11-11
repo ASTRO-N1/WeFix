@@ -6,57 +6,62 @@ const LiveFeed = () => {
   const [newComplaints, setNewComplaints] = useState([]);
 
   useEffect(() => {
-    console.log("🚀 Mounting LiveFeed...");
-
-    // guard: only subscribe once per tab
-    if (window.__livefeed_subscribed) {
-      console.log("⚠️ LiveFeed already subscribed, skipping");
-      return;
-    }
-    window.__livefeed_subscribed = true;
+    console.log("🚀 Initializing Live Feed (STABLE)");
+    // Unique channel name per instance
+    const uniqueChannelName = `livefeed-${Math.random().toString(36).slice(2)}`;
+    console.log("🔌 Creating channel:", uniqueChannelName);
 
     const channel = supabase
-      .channel("livefeed-fixed")
+      .channel(uniqueChannelName)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "complaints" },
         async (payload) => {
-          console.log("📩 Event reached LiveFeed:", payload);
-          const { data } = await supabase
+          console.log("📩 LiveFeed received event:", payload);
+
+          const { data: profile, error } = await supabase
             .from("profiles")
             .select("full_name")
             .eq("id", payload.new.user_id)
-            .maybeSingle();
-          setNewComplaints((prev) => [
-            { ...payload.new, profile: data },
-            ...prev,
-          ]);
+            .single();
+
+          if (error) console.error("❌ Profile fetch error:", error);
+          else {
+            const complaintWithProfile = { ...payload.new, profile };
+            setNewComplaints((prev) => [complaintWithProfile, ...prev]);
+          }
         }
       )
-      .subscribe((status) => console.log("🧭 livefeed-fixed status:", status));
+      .subscribe((status) => console.log("🧭 Subscription status:", status));
+
+    window.supabase = supabase; // for debugging
 
     return () => {
-      console.log("🧹 LiveFeed cleanup");
+      console.log("🧹 Cleaning up channel:", uniqueChannelName);
       supabase.removeChannel(channel);
-      window.__livefeed_subscribed = false;
     };
   }, []);
 
   return (
     <div>
       <h2 className="text-xl font-bold mb-4">Live Feed</h2>
-      {newComplaints.length ? (
-        newComplaints.map((c) => (
-          <div key={c.id} className="bg-gray-700 p-3 rounded-lg">
-            <p className="text-sm text-gray-300">
-              <b>{c.profile?.full_name || "Someone"}</b> just submitted:
-            </p>
-            <p className="font-semibold mt-1">{c.title}</p>
-          </div>
-        ))
-      ) : (
-        <p className="text-sm text-gray-400">Waiting for new complaints…</p>
-      )}
+      <div className="space-y-4">
+        {newComplaints.length > 0 ? (
+          newComplaints.map((complaint) => (
+            <div key={complaint.id} className="bg-gray-700 p-3 rounded-lg">
+              <p className="text-sm text-gray-300">
+                <span className="font-semibold">
+                  {complaint.profile?.full_name || "Unknown"}
+                </span>{" "}
+                just submitted:
+              </p>
+              <p className="font-semibold mt-1">{complaint.title}</p>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-gray-400">Waiting for new complaints...</p>
+        )}
+      </div>
     </div>
   );
 };
