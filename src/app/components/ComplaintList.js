@@ -3,16 +3,19 @@
 import { useComplaints } from "../context/ComplaintContext";
 
 const ComplaintList = () => {
-  const { complaints } = useComplaints();
+  // 1. Change 'complaints' to 'myComplaints'
+  const { myComplaints } = useComplaints();
 
   return (
     <div className="space-y-4">
-      {complaints.length === 0 ? (
+      {/* 2. Update 'complaints.length' */}
+      {myComplaints.length === 0 ? (
         <p className="text-gray-400">
           You have not submitted any complaints yet.
         </p>
       ) : (
-        complaints.map((complaint) => (
+        // 3. Update 'complaints.map'
+        myComplaints.map((complaint) => (
           <div
             key={complaint.id}
             className="bg-gray-800 p-4 rounded-lg shadow-md"
